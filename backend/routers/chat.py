@@ -183,6 +183,20 @@ async def list_sessions():
     return {"sessions": memory_manager.list_sessions()}
 
 
+@router.get("/sessions/{session_id}")
+async def get_session(session_id: str):
+    """Get the full history and details of a specific chat session."""
+    session = memory_manager.get_session(session_id)
+    if not session:
+        return {"error": "Session not found", "messages": []}
+    
+    return {
+        "session_id": session.session_id,
+        "title": session.title,
+        "messages": session.messages
+    }
+
+
 @router.post("/sessions/new")
 async def create_session(request: SessionCreate):
     """Create a new chat session."""

@@ -108,8 +108,23 @@ async function switchSession(sessionId) {
         document.getElementById('chat-title').textContent = session.title;
     }
     renderSessions();
-    // Clear chat and show session messages (sessions are server-side, we just show new UI)
     clearChatUI();
+    
+    // Load historical messages from the backend
+    try {
+        const data = await API.get(`/api/chat/sessions/${sessionId}`);
+        if (data && data.messages && data.messages.length > 0) {
+            // Replay messages into the UI
+            data.messages.forEach(msg => {
+                // Determine if we have metadata to show. The backend doesn't store metadata 
+                // explicitly in the messages list, so we'll just render it as a plain message.
+                // It will be visually identical to after a page reload.
+                addMessageToUI(msg.role, msg.content, null);
+            });
+        }
+    } catch (e) {
+        console.error('Failed to load session history:', e);
+    }
 }
 
 async function deleteSession(sessionId) {

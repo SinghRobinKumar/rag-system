@@ -9,7 +9,11 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("RAG_DATA_DIR", str(BASE_DIR / "data")))
 CHROMA_DIR = Path(os.getenv("RAG_CHROMA_DIR", str(BASE_DIR / "chroma_db")))
+SESSIONS_DIR = Path(os.getenv("RAG_SESSIONS_DIR", str(DATA_DIR / "sessions")))
 FRONTEND_DIR = BASE_DIR / "frontend"
+
+SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+
 
 # ─── Ollama ──────────────────────────────────────────────────────────────────
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
