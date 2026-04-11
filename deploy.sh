@@ -61,12 +61,40 @@ else
     echo -e "${GREEN}✓ Ollama is already installed.${NC}"
 fi
 
-# Check if Ollama service is running (if we are on systemd)
-if command -v systemctl >/dev/null; then
-    if ! systemctl is-active --quiet ollama; then
-        echo -e "${YELLOW}Starting Ollama service...${NC}"
+echo -e "Ensuring Ollama server is running..."
+# Function to check if Ollama API is reachable
+check_ollama_api() {
+    curl -s -o /dev/null http://127.0.0.1:11434/api/version
+}
+
+if ! check_ollama_api; then
+    echo -e "${YELLOW}Ollama server is not running. Starting it...${NC}"
+    
+    # Check if we are using systemd (WSL often does not use it by default)
+    if [ -d "/run/systemd/system" ]; then
+        echo -e "Using systemd to start Ollama..."
         sudo systemctl start ollama
+    else
+        echo -e "systemd not detected (likely WSL). Starting Ollama in the background..."
+        nohup ollama serve > ollama_setup.log 2>&1 &
+        disown
     fi
+    
+    # Wait for the API to become available
+    echo -e "Waiting for Ollama API to become available..."
+    for i in {1..15}; do
+        if check_ollama_api; then
+            echo -e "${GREEN}✓ Ollama server is running.${NC}"
+            break
+        fi
+        sleep 1
+    done
+    
+    if ! check_ollama_api; then
+        echo -e "${RED}Warning: Failed to verify Ollama server is running. Proceeding anyway, but models may fail to pull.${NC}"
+    fi
+else
+    echo -e "${GREEN}✓ Ollama server is already running.${NC}"
 fi
 
 # Determine Models to pull
