@@ -15,7 +15,7 @@ async def route_query(query: str) -> dict:
     Analyze a user query and determine the target directory for search.
 
     Three routing strategies:
-    1. Explicit: User uses @directory syntax (e.g., "@clients list all")
+    1. Explicit: User uses @directory syntax (e.g., "@customers list all")
     2. LLM-based: Ask the LLM to classify the query
     3. Fallback: Search all directories
 
@@ -43,7 +43,6 @@ async def route_query(query: str) -> dict:
             "reason": f"User explicitly mentioned @{explicit_dir}",
         }
 
-    # Strategy 2: LLM-based routing
     try:
         llm_dirs = await _llm_route(query, available_dirs)
         if llm_dirs:
@@ -55,9 +54,10 @@ async def route_query(query: str) -> dict:
                     "reason": f"LLM determined query relates to: {', '.join(llm_dirs)}",
                 }
             else:
+                or_filters = [{"source_dir": d} for d in llm_dirs]
                 return {
                     "target_dirs": llm_dirs,
-                    "filter": {"$or": [{"source_dir": d} for d in llm_dirs]},
+                    "filter": {"$or": or_filters} if len(or_filters) > 1 else or_filters[0],
                     "strategy": "llm",
                     "reason": f"LLM determined query relates to: {', '.join(llm_dirs)}",
                 }
@@ -105,11 +105,15 @@ async def _llm_route(query: str, available_dirs: list[str]) -> list[str]:
         {
             "role": "system",
             "content": (
-                "You are a query router. Given a user question and a list of document directories, "
-                "determine which directory or directories are most relevant to the question. "
-                "Reply with ONLY the directory name(s), comma-separated. "
-                "If the question could apply to ALL directories or you're not sure, reply with 'ALL'. "
-                "Do not explain, just output the directory name(s)."
+                "You are a query router. Given a user question & list of document directories, "
+                "determine which directory or directories are most relevant. "
+                "Reply w/ ONLY directory name(s), comma-separated. "
+                "If question applies to ALL directories or you're unsure, reply 'ALL'. "
+                "Examples:\n"
+                "- 'customers, vendors' if both needed\n"
+                "- 'customers' if only customers\n"
+                "- 'ALL' if all directories\n"
+                "No explanation, just directory names."
             ),
         },
         {
@@ -122,16 +126,21 @@ async def _llm_route(query: str, available_dirs: list[str]) -> list[str]:
     response = response.strip().lower()
 
     if response == "all" or not response:
-        return []
+        return available_dirs
 
-    # Parse the response to extract valid directory names
     result = []
     for part in response.split(","):
         part = part.strip().strip("'\"")
         if part in available_dirs:
             result.append(part)
+        else:
+            for d in available_dirs:
+                if part in d or d in part:
+                    if d not in result:
+                        result.append(d)
+                    break
 
-    return result
+    return result if result else available_dirs
 
 
 def clean_query(query: str) -> str:

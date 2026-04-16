@@ -8,47 +8,12 @@ from datetime import datetime, timedelta
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 
-CLIENTS_DIR = DATA_DIR / "clients"
 VENDORS_DIR = DATA_DIR / "vendors"
 CUSTOMERS_DIR = DATA_DIR / "customers"
 
 # Ensure directories exist
-for d in [CLIENTS_DIR, VENDORS_DIR, CUSTOMERS_DIR]:
+for d in [VENDORS_DIR, CUSTOMERS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
-
-
-def generate_clients():
-    """Generates structured client profile data (CSV & Text)"""
-    print(f"Generating Client Data in {CLIENTS_DIR}...")
-    
-    # 1. Client Roster CSV
-    clients = [
-        ["ClientID", "CompanyName", "ContactName", "Tier", "Industry", "AnnualSpend"],
-        ["C-1001", "Acme Corp", "Alice Smith", "Enterprise", "Logistics", "$1,200,500"],
-        ["C-1002", "GlobalTech", "Bob Johnson", "MidMarket", "Software", "$450,000"],
-        ["C-1003", "Pinnacle Industries", "Charlie Davis", "Enterprise", "Manufacturing", "$2,100,000"],
-        ["C-1004", "Nova Dynamics", "Diana Prince", "SmallBiz", "Consulting", "$85,000"],
-        ["C-1005", "Vertex Solutions", "Evan Wright", "MidMarket", "Healthcare", "$600,000"],
-    ]
-    with open(CLIENTS_DIR / "client_roster_q1_2026.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerows(clients)
-
-    # 2. Detailed Client Profile Text Doc
-    profile_text = """Client Profile: Pinnacle Industries
-    
-Account Manager: Sarah Jenkins
-Lifecycle: Year 4
-Status: Active, High Value
-
-Summary of Q4 Meetings:
-Pinnacle industries has expressed interest in expanding their data center footprint. They plan to buy 40 new rack servers and 12 network switches in Q2 2026.
-They emphasized a firm deadline of June 15th for the delivery of the new hardware due to their fiscal year-end requirements.
-
-Current SLA Level: Platinum (2-hour response time)
-"""
-    with open(CLIENTS_DIR / "pinnacle_industries_profile.txt", "w") as f:
-        f.write(profile_text)
 
 
 def generate_vendors():
@@ -142,7 +107,6 @@ Roll out hotfix patch v2.4.1 to all NovaPhone 14 users by April 15th, 2026. Cust
 
 if __name__ == "__main__":
     print(f"--- RAG Dummy Data Generator ---")
-    generate_clients()
     generate_vendors()
     generate_customers()
     print("Done! Restart or Reindex the RAG system to include the new files.")

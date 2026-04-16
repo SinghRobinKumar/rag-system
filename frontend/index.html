@@ -1,245 +1,480 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RAG Document Intelligence</title>
-    <meta name="description" content="Local RAG system for document intelligence with Ollama">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body>
+    <meta
+      name="description"
+      content="Local RAG system for document intelligence with Ollama"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
     <div class="app-container">
-        <!-- ─── Sidebar ────────────────────────────────────────────── -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                        </svg>
-                    </div>
-                    <span class="logo-text">RAG System</span>
-                </div>
-                <button class="btn-icon" id="btn-toggle-sidebar" title="Toggle sidebar">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-                </button>
+      <!-- ─── Sidebar ────────────────────────────────────────────── -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">
+            <div class="logo-icon">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
             </div>
-
-            <!-- New Chat Button -->
-            <button class="btn-new-chat" id="btn-new-chat">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                <span>New Chat</span>
-            </button>
-
-            <!-- Session List -->
-            <div class="sidebar-section">
-                <div class="section-title">Conversations</div>
-                <div class="session-list" id="session-list">
-                    <!-- Sessions will be rendered here -->
-                </div>
-            </div>
-
-            <!-- Directory Tree -->
-            <div class="sidebar-section">
-                <div class="section-title">
-                    <span>Document Folders</span>
-                    <button class="btn-icon-sm" id="btn-open-upload" title="Upload files">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    </button>
-                </div>
-                <div class="directory-tree" id="directory-tree">
-                    <!-- Directories rendered here -->
-                </div>
-            </div>
-
-            <!-- Model Selector -->
-            <div class="sidebar-footer">
-                <div class="model-selector">
-                    <label class="model-label">Chat Model</label>
-                    <select id="model-select" class="model-dropdown">
-                        <option>Loading...</option>
-                    </select>
-                </div>
-                <div class="system-status" id="system-status">
-                    <span class="status-dot" id="status-dot"></span>
-                    <span class="status-text" id="status-text">Checking...</span>
-                </div>
-            </div>
-        </aside>
-
-        <!-- ─── Main Chat Area ─────────────────────────────────────── -->
-        <main class="main-area">
-            <div class="chat-header" id="chat-header">
-                <div class="chat-title" id="chat-title">New Chat</div>
-                <div class="chat-actions">
-                    <button class="btn-icon" id="btn-open-upload-main" title="Upload files">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    </button>
-                    <button class="btn-icon" id="btn-settings" title="Settings">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/></svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="chat-messages" id="chat-messages">
-                <!-- Welcome Screen -->
-                <div class="welcome-screen" id="welcome-screen">
-                    <div class="welcome-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                        </svg>
-                    </div>
-                    <h1 class="welcome-title">Document Intelligence</h1>
-                    <p class="welcome-subtitle">Ask questions about your documents. Upload files or drop them into the data directories.</p>
-                    <div class="welcome-suggestions">
-                        <button class="suggestion-chip" onclick="useSuggestion(this)">📋 Give me the client list</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)">📊 Summarize vendor contracts</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)">🔍 Search for invoices from Q1</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)">📁 What documents are available?</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="chat-input-area">
-                <div class="input-container">
-                    <textarea
-                        id="chat-input"
-                        placeholder="Ask about your documents... (use @folder to target specific directories)"
-                        rows="1"
-                        autocomplete="off"
-                    ></textarea>
-                    <button class="btn-send" id="btn-send" title="Send message">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    </button>
-                </div>
-                <div class="input-hint">
-                    Press Enter to send · Shift+Enter for new line · @folder to target directory
-                </div>
-            </div>
-        </main>
-
-        <!-- ─── Upload Panel (Right Drawer) ──────────────────────── -->
-        <div class="upload-overlay" id="upload-overlay"></div>
-        <aside class="upload-panel" id="upload-panel">
-            <div class="panel-header">
-                <h2>Upload Documents</h2>
-                <button class="btn-icon" id="btn-close-upload">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-            </div>
-
-            <!-- Directory Selector -->
-            <div class="upload-section">
-                <label class="upload-label">Target Directory</label>
-                <div class="dir-selector-row">
-                    <select id="upload-dir-select" class="upload-dir-dropdown">
-                        <option value="">Select directory...</option>
-                    </select>
-                    <button class="btn-new-dir" id="btn-new-dir" title="Create new directory">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                    </button>
-                </div>
-
-                <!-- New Directory Input (hidden by default) -->
-                <div class="new-dir-input" id="new-dir-input" style="display:none;">
-                    <input type="text" id="new-dir-name" placeholder="e.g. clients_india" class="text-input">
-                    <div class="new-dir-actions">
-                        <button class="btn-sm btn-primary" id="btn-create-dir">Create</button>
-                        <button class="btn-sm btn-ghost" id="btn-cancel-dir">Cancel</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Drop Zone -->
-            <div class="upload-section">
-                <label class="upload-label">Files</label>
-                <div class="drop-zone" id="drop-zone">
-                    <div class="drop-zone-content">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
-                        <p>Drag & drop files here</p>
-                        <span>or</span>
-                        <button class="btn-browse" id="btn-browse">Browse Files</button>
-                        <input type="file" id="file-input" multiple hidden>
-                        <p class="drop-hint">PDF, DOCX, XLSX, TXT, CSV, Images</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- File Queue -->
-            <div class="upload-section" id="file-queue-section" style="display:none;">
-                <label class="upload-label">Selected Files</label>
-                <div class="file-queue" id="file-queue"></div>
-                <button class="btn-upload" id="btn-upload">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    Upload & Index
-                </button>
-            </div>
-
-            <!-- Upload Log -->
-            <div class="upload-section" id="upload-log-section" style="display:none;">
-                <label class="upload-label">Results</label>
-                <div class="upload-log" id="upload-log"></div>
-            </div>
-
-            <!-- Reindex Button -->
-            <div class="upload-section">
-                <button class="btn-reindex" id="btn-reindex">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                    Re-index All Documents
-                </button>
-            </div>
-        </aside>
-
-        <!-- ─── Settings Modal ───────────────────────────────────── -->
-        <div class="modal-overlay" id="settings-modal" style="display:none;">
-            <div class="modal-content glass-panel">
-                <div class="modal-header">
-                    <h2>System Settings</h2>
-                    <button class="btn-icon" id="btn-close-settings">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="settings-group">
-                        <h3>Models</h3>
-                        <div class="settings-row">
-                            <label>Chat Model</label>
-                            <select id="settings-chat-model" class="settings-select"></select>
-                        </div>
-                        <div class="settings-row">
-                            <label>Embedding Model</label>
-                            <select id="settings-embed-model" class="settings-select"></select>
-                        </div>
-                    </div>
-                    <div class="settings-group">
-                        <h3>System Status</h3>
-                        <div class="status-grid" id="settings-status-grid">
-                            <!-- Filled by JS -->
-                        </div>
-                    </div>
-                    <div class="settings-group">
-                        <h3>Document Stats</h3>
-                        <div class="stats-grid" id="settings-stats-grid">
-                            <!-- Filled by JS -->
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <span class="logo-text">RAG System</span>
+          </div>
+          <button
+            class="btn-icon"
+            id="btn-toggle-sidebar"
+            title="Toggle sidebar"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 12h18M3 6h18M3 18h18" />
+            </svg>
+          </button>
         </div>
+
+        <!-- New Chat Button -->
+        <button class="btn-new-chat" id="btn-new-chat">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span>New Chat</span>
+        </button>
+
+        <!-- Session List -->
+        <div class="sidebar-section">
+          <div class="section-title">Conversations</div>
+          <div class="session-list" id="session-list">
+            <!-- Sessions will be rendered here -->
+          </div>
+        </div>
+
+        <!-- Directory Tree -->
+        <!-- <div class="sidebar-section">
+          <div class="section-title">
+            <span>Document Folders</span>
+            <button
+              class="btn-icon-sm"
+              id="btn-open-upload"
+              title="Upload files"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </button>
+          </div>
+          <div class="directory-tree" id="directory-tree">
+          </div>
+        </div> -->
+
+        <!-- Model Selector -->
+        <div class="sidebar-footer">
+          <div class="model-selector">
+            <label class="model-label">Chat Model</label>
+            <select id="model-select" class="model-dropdown">
+              <option>Loading...</option>
+            </select>
+          </div>
+          <div class="system-status" id="system-status">
+            <span class="status-dot" id="status-dot"></span>
+            <span class="status-text" id="status-text">Checking...</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ─── Main Chat Area ─────────────────────────────────────── -->
+      <main class="main-area">
+        <div class="chat-header" id="chat-header">
+          <div class="chat-title" id="chat-title">New Chat</div>
+          <div class="chat-actions">
+            <button
+              class="btn-icon"
+              id="btn-open-upload-main"
+              title="Upload files"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </button>
+            <button class="btn-icon" id="btn-settings" title="Settings">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+          <!-- Welcome Screen -->
+          <div class="welcome-screen" id="welcome-screen">
+            <div class="welcome-icon">
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+            </div>
+            <h1 class="welcome-title">Document Intelligence</h1>
+            <p class="welcome-subtitle">
+              Ask questions about your documents. Upload files or drop them into
+              the data directories.
+            </p>
+            <div class="welcome-suggestions">
+              <button class="suggestion-chip" onclick="useSuggestion(this)">
+                📋 Give me the client list
+              </button>
+              <button class="suggestion-chip" onclick="useSuggestion(this)">
+                📊 Summarize vendor contracts
+              </button>
+              <button class="suggestion-chip" onclick="useSuggestion(this)">
+                🔍 Search for invoices from Q1
+              </button>
+              <button class="suggestion-chip" onclick="useSuggestion(this)">
+                📁 What documents are available?
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <div class="mode-toggle-container">
+            <div class="mode-toggle">
+              <button
+                class="mode-btn active"
+                data-mode="offline"
+                id="mode-offline"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                </svg>
+                <span>Offline</span>
+              </button>
+              <button class="mode-btn" data-mode="web" id="mode-web">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path
+                    d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                  />
+                </svg>
+                <span>Web</span>
+              </button>
+            </div>
+          </div>
+          <div class="input-container">
+            <textarea
+              id="chat-input"
+              placeholder="Ask about your documents... (use @folder to target specific directories)"
+              rows="1"
+              autocomplete="off"
+            ></textarea>
+            <button class="btn-send" id="btn-send" title="Send message">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
+          </div>
+          <div class="input-hint">
+            Press Enter to send · Shift+Enter for new line · @folder to target
+            directory
+          </div>
+        </div>
+      </main>
+
+      <!-- ─── Upload Panel (Right Drawer) ──────────────────────── -->
+      <div class="upload-overlay" id="upload-overlay"></div>
+      <aside class="upload-panel" id="upload-panel">
+        <div class="panel-header">
+          <h2>Upload Documents</h2>
+          <button class="btn-icon" id="btn-close-upload">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Directory Selector -->
+        <div class="upload-section">
+          <label class="upload-label">Target Directory</label>
+          <div class="dir-selector-row">
+            <select id="upload-dir-select" class="upload-dir-dropdown">
+              <option value="">Select directory...</option>
+            </select>
+            <button
+              class="btn-new-dir"
+              id="btn-new-dir"
+              title="Create new directory"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- New Directory Input (hidden by default) -->
+          <div class="new-dir-input" id="new-dir-input" style="display: none">
+            <input
+              type="text"
+              id="new-dir-name"
+              placeholder="e.g. customers_india"
+              class="text-input"
+            />
+            <div class="new-dir-actions">
+              <button class="btn-sm btn-primary" id="btn-create-dir">
+                Create
+              </button>
+              <button class="btn-sm btn-ghost" id="btn-cancel-dir">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drop Zone -->
+        <div class="upload-section">
+          <label class="upload-label">Files</label>
+          <div class="drop-zone" id="drop-zone">
+            <div class="drop-zone-content">
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <p>Drag & drop files here</p>
+              <span>or</span>
+              <button class="btn-browse" id="btn-browse">Browse Files</button>
+              <input type="file" id="file-input" multiple hidden />
+              <p class="drop-hint">PDF, DOCX, XLSX, TXT, CSV, Images</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- File Queue -->
+        <div
+          class="upload-section"
+          id="file-queue-section"
+          style="display: none"
+        >
+          <label class="upload-label">Selected Files</label>
+          <div class="file-queue" id="file-queue"></div>
+          <button class="btn-upload" id="btn-upload">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Upload & Index
+          </button>
+        </div>
+
+        <!-- Upload Log -->
+        <div
+          class="upload-section"
+          id="upload-log-section"
+          style="display: none"
+        >
+          <label class="upload-label">Results</label>
+          <div class="upload-log" id="upload-log"></div>
+        </div>
+
+        <!-- Reindex Button -->
+        <div class="upload-section">
+          <button class="btn-reindex" id="btn-reindex">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path
+                d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+              />
+            </svg>
+            Re-index All Documents
+          </button>
+        </div>
+      </aside>
+
+      <!-- ─── Settings Modal ───────────────────────────────────── -->
+      <div class="modal-overlay" id="settings-modal" style="display: none">
+        <div class="modal-content glass-panel">
+          <div class="modal-header">
+            <h2>System Settings</h2>
+            <button class="btn-icon" id="btn-close-settings">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="settings-group">
+              <h3>Models</h3>
+              <div class="settings-row">
+                <label>Chat Model</label>
+                <select
+                  id="settings-chat-model"
+                  class="settings-select"
+                ></select>
+              </div>
+              <div class="settings-row">
+                <label>Embedding Model</label>
+                <select
+                  id="settings-embed-model"
+                  class="settings-select"
+                ></select>
+              </div>
+            </div>
+            <div class="settings-group">
+              <h3>System Status</h3>
+              <div class="status-grid" id="settings-status-grid">
+                <!-- Filled by JS -->
+              </div>
+            </div>
+            <div class="settings-group">
+              <h3>Document Stats</h3>
+              <div class="stats-grid" id="settings-stats-grid">
+                <!-- Filled by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="/static/js/app.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/upload.js"></script>
     <script src="/static/js/settings.js"></script>
-</body>
+  </body>
 </html>

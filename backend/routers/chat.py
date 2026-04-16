@@ -12,6 +12,7 @@ from backend.services.ollama_client import ollama_client
 from backend.services.vector_store import vector_store
 from backend.services.query_router import route_query, clean_query
 from backend.services.memory_manager import memory_manager
+from backend.services.web_search import web_search_client
 from backend.config import TOP_K_RESULTS
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+    mode: Optional[str] = "offline"
 
 
 class SessionCreate(BaseModel):
@@ -28,78 +30,162 @@ class SessionCreate(BaseModel):
 
 # ─── System Prompt ───────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are a helpful document assistant. You answer questions based on the documents that have been indexed in the system.
+SYSTEM_PROMPT = """You are a professional document intelligence assistant. You analyze and answer questions based on indexed documents.
 
-Rules:
-- Answer questions using ONLY the provided context from retrieved documents.
-- The context below contains the ACTUAL content extracted from the user's documents. USE IT.
-- If the context contains tables, data, numbers, names, or lists — include them in your answer.
-- When asked to show data in a table, format it as a markdown table using the data from the context.
-- Always mention which file(s) your answer is based on.
-- Be thorough — include ALL relevant data from the context, do not summarize unless asked to.
-- Format your responses with markdown for readability.
-- If asked about something not in the context, clearly state that you don't have that information.
-- NEVER say 'the document doesn't contain this information' if the data IS present in the context below."""
+RULES:
+1. Answer using ONLY the provided document context below
+2. Provide clear, well-structured responses with proper formatting
+3. Use markdown: headers (##), bullet points, numbered lists, tables, bold text
+4. Start with a direct answer, then provide supporting details
+5. When showing data, use markdown tables for clarity
+6. Always cite which file(s) your answer comes from
+7. Include ALL relevant data from context - be thorough
+8. If context lacks information, state clearly what's missing
+9. You ONLY have access to local documents - no web search capability
+
+FORMAT YOUR RESPONSE:
+- Start with clear, direct answer
+- Use proper markdown formatting
+- Organize information logically
+- Cite source files naturally in text"""
 
 
 @router.post("")
 async def chat(request: ChatRequest):
     """
-    Main chat endpoint with RAG pipeline.
-    Returns a streaming response (Server-Sent Events).
+    Main chat endpoint w/ RAG pipeline.
+    Supports offline (local docs) & web (online search) modes.
+    Returns streaming response (Server-Sent Events).
     """
     user_message = request.message
+    mode = request.mode or "offline"
     session = memory_manager.get_or_create_session(request.session_id)
 
-    # If this is the first message, set the title
     if len(session.messages) == 0:
         session.title = user_message[:50] + ("..." if len(user_message) > 50 else "")
 
-    # Step 1: Route the query to determine target directories
+    # Fast path: detect greetings/chitchat
+    if _is_greeting_or_chitchat(user_message):
+        session.add_message("user", user_message)
+        
+        async def greeting_response():
+            greeting_reply = _generate_greeting_response(user_message)
+            session.add_message("assistant", greeting_reply)
+            
+            yield f"data: {json.dumps({'type': 'metadata', 'session_id': session.session_id, 'mode': mode, 'route': {'strategy': 'greeting', 'target_dirs': [], 'reason': 'Greeting detected'}, 'sources': []})}\n\n"
+            yield f"data: {json.dumps({'type': 'content', 'content': greeting_reply})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        
+        return StreamingResponse(
+            greeting_response(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
+        )
+
+    if mode == "web":
+        session.add_message("user", user_message)
+        
+        async def web_response():
+            try:
+                search_results = await web_search_client.search(user_message, max_results=5)
+                
+                context = ""
+                sources = []
+                if search_results:
+                    context = "WEB SEARCH RESULTS:\n\n"
+                    for i, result in enumerate(search_results, 1):
+                        context += f"Source {i}: {result['title']}\n"
+                        context += f"URL: {result['url']}\n"
+                        context += f"Content: {result['snippet']}\n\n"
+                        sources.append({
+                            "title": result['title'],
+                            "url": result['url'],
+                            "type": "web"
+                        })
+                
+                system_prompt = """You are a professional web search assistant.
+
+CRITICAL RULES:
+1. Answer ONLY using the web search results provided below
+2. IGNORE your training data - it may be outdated
+3. Synthesize information from multiple sources into a clear, coherent answer
+4. Start with a direct answer, then provide supporting details
+5. Use proper formatting: paragraphs, bullet points, numbered lists
+6. Cite sources naturally in text (e.g., "According to Python.org...")
+7. If results conflict, mention both perspectives
+8. If search results don't contain the answer, say so clearly
+9. Never mention "knowledge cutoff" or training data
+10. You do NOT have access to any local documents or files
+
+FORMAT YOUR RESPONSE:
+- Start with clear, direct answer
+- Use markdown formatting (headers, lists, bold)
+- Group related information
+- End with source links if relevant"""
+
+                # WEB MODE: NO conversation history, NO local context
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"{context}\n\nUser question: {user_message}\n\nProvide a clear, well-formatted answer using the search results above." if context else f"No search results found for: {user_message}\n\nPolitely inform the user that no results were found and suggest rephrasing the question."}
+                ]
+                
+                yield f"data: {json.dumps({'type': 'metadata', 'session_id': session.session_id, 'mode': 'web', 'route': {'strategy': 'web_search', 'target_dirs': [], 'reason': 'Web search mode - no local file access'}, 'sources': sources})}\n\n"
+                
+                full_response = ""
+                async for chunk in ollama_client.chat_stream(messages):
+                    full_response += chunk
+                    yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                
+                session.add_message("assistant", full_response)
+                
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+        
+        return StreamingResponse(
+            web_response(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
+        )
+
+    # OFFLINE MODE: Local RAG
     route_result = await route_query(user_message)
 
-    # Step 2: Determine if this is an aggregate query (needs ALL docs, not just top-K)
     is_aggregate = _is_aggregate_query(user_message)
-
-    # Step 3: Retrieve context
     clean_q = clean_query(user_message)
     retrieved_context = ""
     sources = []
 
     try:
         if is_aggregate and route_result.get("target_dirs"):
-            # AGGREGATE MODE: Fetch ALL chunks from the target directory, grouped by file
-            target_dir = route_result["target_dirs"][0]
-            all_files = vector_store.get_all_by_directory(target_dir)
-
-            if all_files:
-                retrieved_context = f"[Aggregate data from ALL files in '{target_dir}' directory]\n"
-                for fname, chunks in all_files.items():
-                    full_text = "\n".join(c["text"] for c in chunks)
-                    retrieved_context += f"\n{'='*40}\n[File: {target_dir}/{fname}]\n{full_text}\n"
-                    sources.append({
-                        "file": fname,
-                        "directory": target_dir,
-                        "sub_dir": chunks[0]["metadata"].get("sub_dir", "") if chunks else "",
-                    })
-                print(f"[Chat] Aggregate retrieval: {len(all_files)} files from '{target_dir}'")
-            else:
-                retrieved_context = f"[No documents found in '{target_dir}' directory.]"
+            target_dirs = route_result["target_dirs"][:3]
+            
+            for target_dir in target_dirs:
+                all_files = vector_store.get_all_by_directory(target_dir)
+                
+                if all_files:
+                    retrieved_context += f"\n[Data from '{target_dir}' directory]\n"
+                    for fname, chunks in list(all_files.items())[:20]:
+                        full_text = "\n".join(c["text"] for c in chunks[:5])
+                        retrieved_context += f"\n{'='*40}\n[File: {target_dir}/{fname}]\n{full_text}\n"
+                        sources.append({
+                            "file": fname,
+                            "directory": target_dir,
+                            "sub_dir": chunks[0]["metadata"].get("sub_dir", "") if chunks else "",
+                        })
+                    print(f"[Chat] Aggregate: {len(all_files)} files from '{target_dir}' (limited to 20)")
         else:
-            # STANDARD MODE: Semantic search with top-K
             query_embedding = await ollama_client.embed(clean_q)
-
+            
             search_results = vector_store.query(
                 query_embedding=query_embedding,
                 top_k=TOP_K_RESULTS,
                 where=route_result.get("filter"),
             )
 
-            # Build context from results
             if search_results["documents"] and search_results["documents"][0]:
-                for i, (doc, meta) in enumerate(
-                    zip(search_results["documents"][0], search_results["metadatas"][0])
-                ):
+                for doc, meta in zip(search_results["documents"][0], search_results["metadatas"][0]):
                     source_info = f"{meta.get('source_dir', '?')}/{meta.get('file_name', '?')}"
                     retrieved_context += f"\n---\n[Source: {source_info}]\n{doc}\n"
                     sources.append({
@@ -109,12 +195,12 @@ async def chat(request: ChatRequest):
                     })
     except Exception as e:
         print(f"[Chat] Retrieval error: {e}")
-        retrieved_context = "[No documents could be retrieved. The vector database may be empty.]"
+        retrieved_context = "[No documents could be retrieved. Vector database may be empty.]"
 
-    # Step 3: Build the LLM prompt with memory context
+    # Build LLM prompt w/ memory context
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    # Add conversation memory
+    # Add conversation memory (OFFLINE MODE ONLY)
     context_messages = session.get_context_messages()
     messages.extend(context_messages)
 
@@ -129,17 +215,17 @@ async def chat(request: ChatRequest):
 
     messages.append({"role": "user", "content": augmented_message})
 
-    # Step 4: Store the user message in memory
+    # Store user message in memory
     session.add_message("user", user_message)
 
-    # Step 5: Stream the response
+    # Stream response
     async def generate():
         full_response = ""
         try:
-            # Send metadata first
             metadata = {
                 "type": "metadata",
                 "session_id": session.session_id,
+                "mode": "offline",
                 "route": {
                     "strategy": route_result.get("strategy", "unknown"),
                     "target_dirs": route_result.get("target_dirs", []),
@@ -231,12 +317,43 @@ AGGREGATE_PATTERNS = [
 
 def _is_aggregate_query(message: str) -> bool:
     """
-    Detect if a query needs data from ALL documents (aggregate mode)
-    vs. a specific question that can be answered with top-K retrieval.
+    Detect if query needs data from ALL documents (aggregate mode)
+    vs. specific question answerable w/ top-K retrieval.
     """
     msg_lower = message.lower().strip()
     for pattern in AGGREGATE_PATTERNS:
         if re.search(pattern, msg_lower):
             return True
     return False
+
+
+GREETING_PATTERNS = [
+    r"^(hi|hello|hey|greetings|good\s+(morning|afternoon|evening)|howdy|sup|yo)[\s!.?]*$",
+    r"^(how\s+are\s+you|what'?s\s+up|how'?s\s+it\s+going)[\s!.?]*$",
+    r"^(thanks?|thank\s+you|thx|ty)[\s!.?]*$",
+    r"^(bye|goodbye|see\s+ya|later|cya)[\s!.?]*$",
+]
+
+def _is_greeting_or_chitchat(message: str) -> bool:
+    """Detect simple greetings that don't need RAG."""
+    msg = message.strip().lower()
+    if len(msg) > 50:
+        return False
+    for pattern in GREETING_PATTERNS:
+        if re.match(pattern, msg):
+            return True
+    return False
+
+def _generate_greeting_response(message: str) -> str:
+    """Generate quick response for greetings."""
+    msg = message.strip().lower()
+    if any(x in msg for x in ["hi", "hello", "hey", "howdy"]):
+        return "Hello! I'm your document assistant. I can help you search through your uploaded documents and answer questions about them. What would you like to know?"
+    if "how are you" in msg or "what's up" in msg or "how's it going" in msg:
+        return "I'm doing great, thanks for asking! I'm ready to help you with your documents. What can I assist you with?"
+    if "thank" in msg:
+        return "You're welcome! Let me know if you need anything else."
+    if any(x in msg for x in ["bye", "goodbye", "later"]):
+        return "Goodbye! Feel free to come back anytime you need help with your documents."
+    return "Hello! How can I help you with your documents today?"
 

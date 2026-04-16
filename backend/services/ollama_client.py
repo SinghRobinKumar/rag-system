@@ -97,12 +97,9 @@ class OllamaClient:
         texts: list[str],
         model: Optional[str] = None,
     ) -> list[list[float]]:
-        """Generate embeddings for a batch of texts."""
-        results = []
-        for text in texts:
-            emb = await self.embed(text, model)
-            results.append(emb)
-        return results
+        """Generate embeddings for a batch of texts in parallel."""
+        tasks = [self.embed(text, model) for text in texts]
+        return await asyncio.gather(*tasks)
 
     # ─── Model Management ────────────────────────────────────────────────
 

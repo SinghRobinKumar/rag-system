@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 
     # Create default data directories
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    for default_dir in ["clients", "vendors", "customers"]:
+    for default_dir in ["vendors", "customers"]:
         (DATA_DIR / default_dir).mkdir(exist_ok=True)
 
     # Start file watcher

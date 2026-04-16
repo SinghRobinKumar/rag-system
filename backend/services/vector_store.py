@@ -65,7 +65,7 @@ class VectorStore:
         Args:
             query_embedding: The query vector
             top_k: Number of results to return
-            where: Metadata filter (e.g., {"source_dir": "clients"})
+            where: Metadata filter (e.g., {"source_dir": "customers"})
             where_document: Document content filter
 
         Returns:

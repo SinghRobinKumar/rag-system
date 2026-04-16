@@ -113,7 +113,7 @@ echo -e "${GREEN}✓ Models are downloaded and ready.${NC}"
 
 # 5. Directories Creation
 echo -e "\n${YELLOW}[5/5] Ensuring data directories exist...${NC}"
-mkdir -p data/clients data/vendors data/customers
+mkdir -p data/vendors data/customers
 echo -e "${GREEN}✓ Data directories are ready.${NC}"
 
 # Start System
