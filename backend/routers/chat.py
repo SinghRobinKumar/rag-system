@@ -83,11 +83,33 @@ async def chat(request: ChatRequest):
         )
 
     if mode == "web":
-        session.add_message("user", user_message)
         
         async def web_response():
             try:
-                search_results = await web_search_client.search(user_message, max_results=5)
+                # Rewrite ambiguous follow-up queries using conversation history
+                search_query = user_message
+                context_messages = session.get_context_messages()
+                if context_messages and len(context_messages) > 0:
+                    # Use LLM to rewrite the query with conversation context
+                    rewrite_messages = [
+                        {"role": "system", "content": "You are a search query rewriter. Given a conversation history and a follow-up question, rewrite the follow-up into a standalone web search query that captures the full intent. Output ONLY the rewritten search query, nothing else. If the question is already clear and standalone, return it as-is."},
+                    ]
+                    # Add recent conversation for context (last few turns)
+                    for msg in context_messages[-6:]:
+                        rewrite_messages.append({"role": msg["role"], "content": msg["content"][:200]})
+                    rewrite_messages.append({"role": "user", "content": f"Rewrite this follow-up as a standalone search query: {user_message}"})
+                    
+                    try:
+                        search_query = await ollama_client.chat(rewrite_messages)
+                        search_query = search_query.strip().strip('"').strip("'")
+                        if not search_query or len(search_query) < 3:
+                            search_query = user_message
+                        print(f"[Chat] Web query rewrite: '{user_message}' -> '{search_query}'")
+                    except Exception as e:
+                        print(f"[Chat] Query rewrite failed, using original: {e}")
+                        search_query = user_message
+
+                search_results = await web_search_client.search(search_query, max_results=5)
                 
                 context = ""
                 sources = []
@@ -116,6 +138,7 @@ CRITICAL RULES:
 8. If search results don't contain the answer, say so clearly
 9. Never mention "knowledge cutoff" or training data
 10. You do NOT have access to any local documents or files
+11. For follow-up questions, refer to the conversation history to understand the full context of what the user is asking about
 
 FORMAT YOUR RESPONSE:
 - Start with clear, direct answer
@@ -123,11 +146,22 @@ FORMAT YOUR RESPONSE:
 - Group related information
 - End with source links if relevant"""
 
-                # WEB MODE: NO conversation history, NO local context
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"{context}\n\nUser question: {user_message}\n\nProvide a clear, well-formatted answer using the search results above." if context else f"No search results found for: {user_message}\n\nPolitely inform the user that no results were found and suggest rephrasing the question."}
-                ]
+                # Build messages with conversation history for context
+                messages = [{"role": "system", "content": system_prompt}]
+
+                # Include conversation history so follow-up questions work
+                context_messages = session.get_context_messages()
+                messages.extend(context_messages)
+
+                # Add current user question with web search results
+                if context:
+                    augmented_message = f"{context}\n\nUser question: {user_message}\n\nProvide a clear, well-formatted answer using the search results above."
+                else:
+                    augmented_message = f"No search results found for: {user_message}\n\nPolitely inform the user that no results were found and suggest rephrasing the question."
+                messages.append({"role": "user", "content": augmented_message})
+
+                # Store user message in memory (after building context to avoid duplicate)
+                session.add_message("user", user_message)
                 
                 yield f"data: {json.dumps({'type': 'metadata', 'session_id': session.session_id, 'mode': 'web', 'route': {'strategy': 'web_search', 'target_dirs': [], 'reason': 'Web search mode - no local file access'}, 'sources': sources})}\n\n"
                 
@@ -137,6 +171,9 @@ FORMAT YOUR RESPONSE:
                     yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
                 
                 session.add_message("assistant", full_response)
+                
+                # Summarize older turns if conversation is getting long
+                await memory_manager.summarize_if_needed(session)
                 
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
                 
