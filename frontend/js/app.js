@@ -167,6 +167,7 @@ async function loadDirectories() {
 
 function renderDirectoryTree() {
   const container = document.getElementById("directory-tree");
+  if (!container) return; // Element may be commented out in HTML
   if (!state.directories.length) {
     container.innerHTML =
       '<div style="padding:6px 8px;color:var(--text-muted);font-size:12px;">No folders yet</div>';
@@ -337,9 +338,10 @@ function setupEventListeners() {
     document.getElementById("upload-panel").classList.add("open");
     document.getElementById("upload-overlay").classList.add("active");
   };
-  document
-    .getElementById("btn-open-upload")
-    .addEventListener("click", openUpload);
+  const btnOpenUpload = document.getElementById("btn-open-upload");
+  if (btnOpenUpload) {
+    btnOpenUpload.addEventListener("click", openUpload);
+  }
   document
     .getElementById("btn-open-upload-main")
     .addEventListener("click", openUpload);
